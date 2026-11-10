@@ -1,5 +1,5 @@
 // 생각기록장 오프라인 지원: 앱 파일은 미리 저장, 글꼴은 처음 받을 때 저장
-const CACHE = "thought-record-v7";
+const CACHE = "thought-record-v8";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
