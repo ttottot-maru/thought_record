@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a4ea3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="생각기록">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>생각기록장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: phone-first notebook. Top: title + 3 tabs. Middle: one step per screen. Bottom: thumb-reach prev/next bar. */
+:root{
+  --bg:#f3f4f7; --surface:#ffffff; --ink:#1c2230; --muted:#5b6374; --line:#dde1e8;
+  --accent:#3a4ea3; --accent-soft:#e6e9f7; --on-accent:#ffffff;
+  --q-red:#c73b3b; --q-red-soft:#fbe9e8;
+  --q-yellow:#a87800; --q-yellow-soft:#fdf3d6;
+  --q-blue:#2f69b3; --q-blue-soft:#e5eefa;
+  --q-green:#2d8650; --q-green-soft:#e3f3e8;
+  --font-display:"Gowun Batang","Nanum Myeongjo",serif;
+  --font-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --radius:10px;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171e; --surface:#1c2029; --ink:#e7e9ee; --muted:#a1a8b6; --line:#2e3441;
+    --accent:#8c9cf0; --accent-soft:#272e4d; --on-accent:#10142a;
+    --q-red:#f08080; --q-red-soft:#3a2123; --q-yellow:#e8c25a; --q-yellow-soft:#3a3120;
+    --q-blue:#7fb0f0; --q-blue-soft:#1f2c40; --q-green:#6fcf94; --q-green-soft:#1d3327;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171e; --surface:#1c2029; --ink:#e7e9ee; --muted:#a1a8b6; --line:#2e3441;
+  --accent:#8c9cf0; --accent-soft:#272e4d; --on-accent:#10142a;
+  --q-red:#f08080; --q-red-soft:#3a2123; --q-yellow:#e8c25a; --q-yellow-soft:#3a3120;
+  --q-blue:#7fb0f0; --q-blue-soft:#1f2c40; --q-green:#6fcf94; --q-green-soft:#1d3327;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.6;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+.wrap{max-width:760px;margin:0 auto;padding:calc(14px + var(--sat)) 16px calc(110px + var(--sab))}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+h1{font-family:var(--font-display);font-size:24px;margin:0;font-weight:700}
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tabs button{border:0;background:none;padding:7px 12px;border-radius:999px;cursor:pointer;font-size:14px;color:var(--muted);min-height:36px}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+
+.stepper{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0 14px;list-style:none;padding:0}
+.stepper button{width:100%;border:0;background:none;cursor:pointer;padding:4px 0;display:flex;flex-direction:column;gap:5px;align-items:stretch}
+.stepper .bar{height:4px;border-radius:2px;background:var(--line)}
+.stepper .lbl{font-size:12px;color:var(--muted);text-align:center;white-space:nowrap}
+.stepper .done .bar{background:var(--accent);opacity:.45}
+.stepper .cur .bar{background:var(--accent)}
+.stepper .cur .lbl{color:var(--ink);font-weight:600}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{font-family:var(--font-display);font-size:21px;margin:0 0 4px}
+.guide{color:var(--muted);margin:0 0 14px;font-size:14px}
+.group{margin-top:18px}
+.group h3{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 13px;cursor:pointer;font-size:14px;line-height:1.3;min-height:38px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+textarea,input[type=text]{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:var(--radius);padding:10px 12px;font:inherit;font-size:16px;resize:vertical}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+.meter{display:grid;grid-template-columns:auto 1fr;grid-template-rows:1fr auto;gap:6px;max-width:420px}
+.meter .yaxis{display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:6px 0;line-height:1.3;text-align:center}
+.meter .xaxis{grid-column:2;font-size:11px;color:var(--muted);text-align:center}
+.quads{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.quad{border:2px solid transparent;border-radius:var(--radius);padding:10px 12px;cursor:pointer;text-align:left;min-height:70px;display:flex;flex-direction:column;justify-content:space-between}
+.quad b{font-size:14px}.quad span{font-size:12px;opacity:.85}
+.quad.red{background:var(--q-red-soft);color:var(--q-red)}
+.quad.yellow{background:var(--q-yellow-soft);color:var(--q-yellow)}
+.quad.blue{background:var(--q-blue-soft);color:var(--q-blue)}
+.quad.green{background:var(--q-green-soft);color:var(--q-green)}
+.quad[aria-pressed="true"]{border-color:currentColor}
+.quad .cnt{font-variant-numeric:tabular-nums;font-weight:600}
+.words{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+.word{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 4px;cursor:pointer;text-align:center;display:flex;flex-direction:column;gap:1px;min-height:52px;justify-content:center}
+.word .ko{font-size:14px;line-height:1.3}.word .en{font-size:10.5px;color:var(--muted)}
+.word[aria-pressed="true"]{color:var(--qc);background:var(--qs);border-color:var(--qc)}
+.word[aria-pressed="true"] .en{color:inherit;opacity:.8}
+.words-head{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;gap:8px;flex-wrap:wrap}
+.words-head small{color:var(--muted);font-size:12px}
+.tray{display:flex;flex-direction:column;gap:8px}
+.trow{display:grid;grid-template-columns:120px 1fr 64px 28px;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--bg)}
+.trow .nm{font-weight:600;color:var(--qc)}
+.trow input[type=range]{width:100%;accent-color:var(--qc);height:28px}
+.trow output{font-variant-numeric:tabular-nums;text-align:right;font-size:13px;white-space:nowrap}
+.trow .before{color:var(--muted)}
+.x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;min-height:32px}
+.empty{color:var(--muted);font-size:13px;padding:10px;border:1px dashed var(--line);border-radius:8px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.card{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:12px 14px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:5px}
+.card[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.card .t{display:flex;gap:8px;align-items:baseline;font-weight:600}
+.card .n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:18px}
+.card .d{font-size:13px;color:var(--muted)}
+.card .ex{font-size:13.5px;font-family:var(--font-display)}
+.card .ex::before{content:"예) ";color:var(--muted);font-family:var(--font-body)}
+.card.belief .ex::before{content:"대표 생각 · "}
+.card.alt .ex::before{content:""}
+.card .from{font-size:11.5px;color:var(--muted)}
+
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + var(--sab));z-index:5}
+.nav .in{max-width:760px;margin:0 auto;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:10px 18px;cursor:pointer;font-weight:500;min-height:44px}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.sm{padding:6px 12px;min-height:36px;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}
+.nav .pos{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.sum{display:flex;flex-direction:column;gap:12px}
+.sum-row{display:grid;grid-template-columns:96px 1fr;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.sum-row:last-child{border-bottom:0;padding-bottom:0}
+.sum-row .k{font-size:13px;color:var(--muted);font-weight:600}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:13px;margin:0 4px 4px 0;background:var(--bg);border:1px solid var(--line)}
+.tag.q{background:var(--qs);color:var(--qc);border-color:transparent;font-variant-numeric:tabular-nums}
+.none{color:var(--muted);font-size:13px}
+.note{font-family:var(--font-display);font-size:14.5px;margin-top:4px}
+.alt-list{margin:4px 0 0;padding-left:18px;font-family:var(--font-display);font-size:14.5px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:600}
+.big{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.big small{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px}
+.qbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line)}
+.qbar i{display:block;height:100%}
+.qleg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:12px;color:var(--muted)}
+.qleg b{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+.rank{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.rank li{display:grid;grid-template-columns:1fr auto;gap:8px}
+.rank .c{font-variant-numeric:tabular-nums;color:var(--muted)}
+.rank .ml{grid-column:1/-1;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.rank .ml i{display:block;height:100%;background:var(--accent)}
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.rec>button{width:100%;border:0;background:none;text-align:left;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.rec .date{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rec .line{display:flex;flex-wrap:wrap;gap:2px;grid-column:1/-1}
+.rec .meta{font-size:12px;color:var(--muted);white-space:nowrap}
+.rec .body{padding:12px 14px 14px;border-top:1px solid var(--line)}
+.rec .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.prog{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.prog .pb{width:72px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog .pb i{display:block;height:100%;background:var(--accent)}
+.done-hero{text-align:center;padding:8px 0 4px}
+.done-hero .medal{width:64px;height:64px;margin:0 auto 10px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;font-weight:700}
+.done-hero h2{font-size:24px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.cmp div{background:var(--bg);border-radius:10px;padding:10px 12px}
+.cmp b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.cmp span{font-size:12px;color:var(--muted)}
+.faith{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--bg)}
+.faith h3{color:var(--ink)!important}
+.calhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
+.calhead h2{margin:0;font-size:17px;font-family:var(--font-display)}
+.calhead small{color:var(--muted);font-size:12px}
+.cal{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
+.cell{border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:66px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-variant-numeric:tabular-nums}
+.cell .num{font-size:11px;color:var(--muted)}
+.cell .md{font-size:13.5px;font-weight:600;line-height:1.2}
+.cell .pt{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.cell.empty{background:transparent;border-style:dashed;cursor:default}
+.cell.empty .num{font-size:13px;opacity:.6}
+.cell[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.detail .dh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.detail .dh b{font-size:15px}
+.detail .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.editbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--q-yellow-soft);color:var(--ink);border-radius:10px;padding:8px 12px;font-size:13.5px;margin-bottom:10px}
+.rp{font-size:14.5px}
+.rp h3.sec{font-family:var(--font-display);font-size:17px;margin:22px 0 8px;color:var(--ink)}
+.rp .insight{background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.rp .insight li{padding-left:14px;position:relative}
+.rp .insight li::before{content:"";position:absolute;left:0;top:.65em;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.rp .bars{display:flex;align-items:flex-end;gap:3px;height:90px;border-bottom:1px solid var(--line);padding-top:6px}
+.rp .bars i{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
+.rp .bars i.neg{background:var(--q-red)}
+.rp .bx{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.rp .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rp .rbox{background:var(--bg);border-radius:10px;padding:12px}
+.rp .rbox h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
+.rp ol.q{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.donebox{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:14px}
+.donebox h3{margin:0 0 4px;font-size:15px;color:var(--ink)!important}
+.donebox p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.stepline{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.stepline .no{width:24px;height:24px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex:none}
+.stepline .no.ok{background:var(--q-green);color:#fff}
+.stepline .tx{flex:1;font-size:14px}
+.sheet.full .box{max-height:94vh;border-radius:16px 16px 0 0}
+.rlist{display:flex;flex-direction:column;gap:6px}
+.rlist .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rlist .it:last-child{border-bottom:0}
+@media (max-width:560px){.rp .two{grid-template-columns:1fr}}
+.flag{font-size:11px;background:var(--q-yellow-soft);color:var(--q-yellow);border-radius:4px;padding:1px 6px;margin-left:6px}
+
+.set{display:flex;flex-direction:column;gap:14px}
+.set section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.set h2{font-size:16px;margin:0 0 4px}
+.set p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.switches{display:flex;flex-direction:column;gap:2px}
+.switch{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px}
+.switch:last-child{border-bottom:0}
+.switch input{width:20px;height:20px;accent-color:var(--accent)}
+.install ol{margin:0;padding-left:20px;font-size:14px}
+.install li{margin-bottom:4px}
+
+.sheet{position:fixed;inset:0;background:rgba(10,12,20,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.sheet.open{display:flex}
+.sheet .box{background:var(--surface);border-radius:16px 16px 0 0;padding:18px 16px calc(16px + var(--sab));width:100%;max-width:560px;max-height:88vh;overflow:auto}
+.sheet h2{margin:0 0 4px;font-size:18px;font-family:var(--font-display)}
+.sheet .preview{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13.5px;margin:12px 0;max-height:34vh;overflow:auto}
+.sheet .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.sheet.center{align-items:center;padding:16px}
+.sheet.center .box{border-radius:14px;max-width:360px;padding:18px}
+.btn.danger{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.toast{position:fixed;left:50%;bottom:calc(84px + var(--sab));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+footer.disc{margin-top:22px;font-size:12px;color:var(--muted)}
+
+@media (max-width:560px){
+  .words{grid-template-columns:repeat(3,1fr)}
+  .trow{grid-template-columns:1fr 64px 28px}
+  .trow .nm{grid-column:1/-1}
+  .sum-row{grid-template-columns:1fr;gap:4px}
+  .stepper .lbl{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div><h1>생각기록장</h1><div class="prog" id="prog"></div></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-new" aria-selected="true">새 기록</button>
+      <button role="tab" id="tab-list" aria-selected="false">지난 기록<span id="tab-count"></span></button>
+      <button role="tab" id="tab-set" aria-selected="false">설정</button>
+    </div>
+  </header>
+
+  <section id="view-new">
+    <div id="edit-bar"></div>
+    <ol class="stepper" id="stepper"></ol>
+    <div class="panel" id="panel"></div>
+  </section>
+
+  <section id="view-list" hidden>
+    <div id="records"></div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section id="view-set" class="set" hidden>
+    <section>
+      <h2>그룹방에서 쓸 이름</h2>
+      <p>공유할 때 맨 위에 붙는 이름입니다. 별명도 괜찮습니다.</p>
+      <input type="text" id="nick" maxlength="20" placeholder="예) 하늘">
+    </section>
+    <section>
+      <h2>공유할 때 기본으로 넣을 항목</h2>
+      <p>공유 화면에서 매번 바꿀 수도 있습니다.</p>
+      <div class="switches" id="share-defaults"></div>
+    </section>
+    <section>
+      <h2>관점 전환에 신앙 질문 보이기</h2>
+      <p>6단계에 ‘신앙의 눈으로 보기’ 질문 2개를 보여 줍니다. 원하지 않으면 끌 수 있습니다.</p>
+      <div class="switches"><label class="switch" for="faith-on"><span>신앙 질문 보이기</span><input type="checkbox" id="faith-on"></label></div>
+    </section>
+    <section>
+      <h2>분석 리포트 보관함</h2>
+      <p>20개를 완주하고 만든 리포트가 여기에 남습니다. 기록을 초기화해도 지워지지 않습니다.</p>
+      <div class="rlist" id="report-list"></div>
+    </section>
+    <section>
+      <h2>백업과 복원</h2>
+      <p>기록은 이 휴대폰에만 저장됩니다. 휴대폰을 바꾸거나 브라우저 데이터를 지우면 사라지니, 가끔 백업 파일을 만들어 두세요.</p>
+      <div class="row"><button class="btn sm" id="btn-backup">백업 파일 만들기</button>
+        <label class="btn sm" for="restore-file" style="display:inline-flex;align-items:center">백업 파일 불러오기</label>
+        <input type="file" id="restore-file" accept=".json,application/json" hidden></div>
+      <p class="hint" id="store-note" style="margin-top:10px"></p>
+    </section>
+    <section class="install">
+      <h2>홈 화면에 앱으로 설치하기</h2>
+      <p id="install-state">설치하면 앱처럼 열리고, 인터넷이 없어도 기록할 수 있습니다.</p>
+      <div class="row" style="margin-bottom:10px"><button class="btn sm primary" id="btn-install" hidden>지금 설치하기</button></div>
+      <ol>
+        <li><b>아이폰</b>: Safari로 이 주소를 열고 → 아래쪽 공유 버튼 → ‘홈 화면에 추가’</li>
+        <li><b>안드로이드</b>: Chrome으로 열고 → 오른쪽 위 ⋮ → ‘홈 화면에 추가’ 또는 ‘앱 설치’</li>
+      </ol>
+    </section>
+  </section>
+
+  <footer class="disc">감정 어휘: 예일대 감정지능센터 무드미터(Mood Meter) 100단어를 한국어로 옮김(비공식 번역). 이 기록장은 스스로 돌아보기 위한 도구이며 상담이나 치료를 대신하지 않습니다.</footer>
+</div>
+
+<nav class="nav" id="nav"><div class="in">
+  <button class="btn" id="btn-prev">이전</button><span class="pos" id="pos"></span><button class="btn primary" id="btn-next">다음</button>
+</div></nav>
+
+<div class="sheet" id="share-sheet" role="dialog" aria-modal="true" aria-labelledby="share-title">
+  <div class="box">
+    <h2 id="share-title">그룹방에 공유하기</h2>
+    <p class="none" style="margin:0">넣을 항목을 고르세요. 아래 미리보기 그대로 보내집니다.</p>
+    <div class="chips" id="share-parts" style="margin-top:10px"></div>
+    <div class="preview" id="share-preview"></div>
+    <div class="acts"><button class="btn" id="share-close">닫기</button><button class="btn" id="share-copy">복사하기</button><button class="btn primary" id="share-go">공유하기</button></div>
+  </div>
+</div>
+<div class="sheet full" id="report-sheet" role="dialog" aria-modal="true" aria-labelledby="report-title">
+  <div class="box" id="report-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 id="report-title" style="margin:0">분석 리포트</h2><button class="btn sm" id="report-close">닫기</button></div>
+    <div id="report-body"></div>
+    <div class="acts" style="margin-top:16px"><button class="btn" id="report-share">요약 공유</button><button class="btn primary" id="report-file">리포트 파일 저장</button></div>
+  </div>
+</div>
+<div class="sheet center" id="confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-msg">
+  <div class="box"><p id="confirm-msg" style="margin:0 0 16px"></p><div class="acts"><button class="btn" id="confirm-no">취소</button><button class="btn danger" id="confirm-yes">삭제</button></div></div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ================= 데이터 ================= */
+const SITUATION={
+  when:{label:"언제",opts:["아침","낮","저녁","밤","새벽"]},
+  where:{label:"어디서",opts:["집","직장","학교","이동 중","식당·카페","온라인·메신저","공공장소"]},
+  who:{label:"누구와",opts:["혼자","배우자·연인","자녀","부모","형제자매","친구","직장 동료","상사","선생님","낯선 사람"]},
+  what:{label:"무슨 일이 있었나 (보이고 들린 사실)",opts:["대화를 나눔","의견이 엇갈림","부탁을 받음","부탁을 했음","부탁이 거절됨","평가·피드백을 받음","약속이 바뀌거나 늦어짐","답장·연락이 오지 않음","실수가 생김","다른 사람의 성과를 들음","SNS·뉴스를 봄","마감·일이 몰림","혼자 생각하던 중"]}
+};
+const Q={
+  red:{name:"빨강",desc:"에너지 높음 · 불쾌",words:[["Enraged","격분한"],["Panicked","공황 상태인"],["Stressed","스트레스 받는"],["Jittery","초조한"],["Shocked","충격받은"],["Livid","몹시 화가 난"],["Furious","분노한"],["Frustrated","좌절한"],["Tense","긴장한"],["Stunned","어안이 벙벙한"],["Fuming","씩씩대는"],["Frightened","겁먹은"],["Angry","화난"],["Nervous","조마조마한"],["Restless","안절부절못하는"],["Anxious","불안한"],["Apprehensive","염려되는"],["Worried","걱정되는"],["Irritated","짜증 나는"],["Annoyed","성가신"],["Repulsed","혐오스러운"],["Troubled","심란한"],["Concerned","우려되는"],["Uneasy","마음이 불편한"],["Peeved","언짢은"]]},
+  yellow:{name:"노랑",desc:"에너지 높음 · 유쾌",words:[["Surprised","놀란"],["Upbeat","들뜬"],["Festive","축제 기분인"],["Exhilarated","짜릿한"],["Ecstatic","황홀한"],["Hyper","흥분한"],["Cheerful","쾌활한"],["Motivated","의욕이 넘치는"],["Inspired","영감을 받은"],["Elated","의기양양한"],["Energized","활기찬"],["Lively","생기 있는"],["Excited","신나는"],["Optimistic","낙관적인"],["Enthusiastic","열정적인"],["Pleased","기쁜"],["Focused","집중된"],["Happy","행복한"],["Proud","자랑스러운"],["Thrilled","설레는"],["Pleasant","유쾌한"],["Joyful","즐거운"],["Hopeful","희망찬"],["Playful","장난기 있는"],["Blissful","더없이 행복한"]]},
+  blue:{name:"파랑",desc:"에너지 낮음 · 불쾌",words:[["Disgusted","역겨운"],["Glum","시무룩한"],["Disappointed","실망한"],["Down","가라앉은"],["Apathetic","무감각한"],["Pessimistic","비관적인"],["Morose","침울한"],["Discouraged","낙담한"],["Sad","슬픈"],["Bored","지루한"],["Alienated","소외된"],["Miserable","비참한"],["Lonely","외로운"],["Disheartened","기운 빠진"],["Tired","피곤한"],["Despondent","의욕을 잃은"],["Depressed","우울한"],["Sullen","뚱한"],["Exhausted","기진맥진한"],["Fatigued","지친"],["Despair","절망한"],["Hopeless","희망이 없는"],["Desolate","쓸쓸한"],["Spent","소진된"],["Drained","진이 빠진"]]},
+  green:{name:"초록",desc:"에너지 낮음 · 유쾌",words:[["At Ease","마음이 놓이는"],["Easygoing","느긋한"],["Content","만족한"],["Loving","다정한"],["Fulfilled","충만한"],["Calm","차분한"],["Secure","안정된"],["Satisfied","흡족한"],["Grateful","감사한"],["Touched","뭉클한"],["Relaxed","편안한"],["Chill","여유로운"],["Restful","푹 쉰"],["Blessed","축복받은"],["Balanced","균형 잡힌"],["Mellow","온화한"],["Thoughtful","생각이 깊어지는"],["Peaceful","평화로운"],["Comfy","포근한"],["Carefree","걱정 없는"],["Sleepy","나른한"],["Complacent","안주하는"],["Tranquil","고요한"],["Cozy","아늑한"],["Serene","평온한"]]}
+};
+const QORDER=["red","yellow","blue","green"];
+const WORD_Q={};QORDER.forEach(q=>Q[q].words.forEach(([en,ko])=>WORD_Q[en]={q,ko}));
+
+// [이름, 설명, 예시, 관점 전환 문장]
+const THOUGHTS=[
+  ["판단","상대나 외부를 바라보면서 해석을 하는 ‘자기만의 틀과 생각’","저 사람은 나를 싫어해","내가 실제로 본 것은 ___이고, 나머지는 내 해석일 수 있다."],
+  ["비난","부정적 해석을 곁들여 ‘상대에게 잘못이 있으며, 상대가 문제라는 생각’을 포함하는 표현","고마움도 모르는 뻔뻔한 인간 같으니","상대를 탓하기보다, 내가 바란 것이 무엇이었는지 말해 볼 수 있다."],
+  ["비교","내가 원하는 대로 상대가 해주지 않을 때 상대에게 수치심을 주어서라도 상대를 고치겠다는 방식의 표현","옆집 애는 잘하던데, 우리 애는 왜 이러지","다른 사람과 견주지 않고, 이 사람만의 속도와 사정을 보자."],
+  ["강요","실질적 폭력, 무력이나 두려움을 활용해서라도 상대를 움직이게끔 하기 위해 쓰는 방법","좋은 말로 할 때 내 말대로 해","명령 대신 부탁으로 바꿔 보자. “___해 줄 수 있을까?”"],
+  ["당연시","‘인간이라면 마땅히 해야 할 일’이라고 주장하면서 상대에게 어떤 행위를 암묵적으로 강요하는 대화 방식","중학생이면 당연히 이 정도는 해야 하는 거 아니야?","‘당연히’ 대신 ‘나는 ___을 바란다’로 말해 보자."],
+  ["합리화","자신의 행위에 대해 반성이나 성찰보다는 남 탓을 하며 이유를 찾을 때 드러나는 표현","네가 제대로 하면 내가 화낼 일이 없지","이 일에서 내 몫의 책임은 무엇이었을까?"]
+];
+const DISTORTIONS=[
+  ["이분법적 사고","상황을 양극단적인 측면에서 판단하고 중간을 인정하지 않는 흑백논리 위주의 사고","100점이 아니면 의미 없어. 좋아하는 게 아니면 싫다는 거야.","완전히 좋거나 나쁜 것 사이에 중간이 있다. 이번 일은 몇 점쯤일까?"],
+  ["과일반화","한두 번의 경험을 바탕으로 일반적인 결론을 내리고 무관한 상황에서도 그 결론을 적용하는 방식","인도 사람이 새치기했어. 인도 사람들은 어쩔 수 없어.","이번 한 번의 일이 늘 그렇다는 뜻은 아니다."],
+  ["정신적 여과","선택적 추상화. 여러 정보 중 전체가 아닌 일부를 뽑아 선택적으로 주목하고 전체를 판단하는 것","잘한 것, 못한 것 다 피드백했는데, 결국 내 보고서가 별로라는 거지?","아쉬운 부분만 보고 있었다. 괜찮았던 부분도 함께 보자."],
+  ["비약적 결론","확인하지 않고 성급한 결론을 내리는 방식","다툰 뒤로 남편이 이번 주 내내 늦게 들어온다. 나에 대한 마음이 완전히 떠난 게 분명하다.","아직 확인한 사실은 없다. 직접 물어볼 수 있다."],
+  ["과대평가 / 과소평가","사건의 의미나 중요성을 실제보다 과도하게 확대하거나 지나치게 축소하는 것","상사가 잘했다고 했지만, 운이 좋았을 뿐이야.","이 일의 크기를 있는 그대로 보자. 내가 잘한 것도 인정해도 된다."],
+  ["감정적 추론","현실적 근거 없이 막연한 감정을 느낄 때 그 감정에 따라 결론을 내리는 방식","아이들에게 죄책감이 든다. 나는 좋은 엄마가 아니다.","그렇게 느낀다고 해서 그것이 사실인 것은 아니다."],
+  ["당위적 진술","‘당연히 해야 한다’와 ‘반드시 해야 한다’는 유연성, 개방성이 없는 생각","친구라면 당연히 내 편을 들어줘야지.","‘해야 한다’ 대신 ‘그러면 좋겠다’로 바꿔 보자."],
+  ["명명하기","극단적이고 정당하지 않은 이름을 자기 자신에게 붙이는 것","나는 실패자야. 인생 낙오자야.","한 번의 행동이 나라는 사람 전체를 말해 주지 않는다."],
+  ["개인화","자신과 무관한 사건인데도 자신과 관련된 것으로 잘못 해석하는 것","모임에서 그 사람이 웃은 건 나를 무시하기 때문이다.","이 일에는 나 말고도 여러 이유가 있을 수 있다."],
+  ["재앙화","대안적인 가능성에 대한 고려 없이 최악의 부정적인 결과를 예상하는 것","지금 이대로 성장하면 내 자식의 인생은 꼬일 것이다.","최악 말고, 가장 그럴듯한 결과는 무엇일까?"],
+  ["독심술","타인이 어떤 생각을 하는지 물어보지 않은 채 마음대로 추측하고 단정하는 방식","나는 아이 표정만 봐도 걔가 무슨 생각을 하는지 다 알아.","상대의 마음은 물어보기 전에는 알 수 없다."]
+];
+const ALT_QUESTIONS=["사실과 내 해석을 나눠 보면?","이 생각과 맞지 않는 증거는?","친구가 같은 일을 겪었다면 뭐라고 해 줄까?","다른 가능성은 없을까?","가장 그럴듯한 결과는?","1년 뒤에도 이 일이 중요할까?","내가 바꿀 수 있는 것과 없는 것은?","상대 입장에서 보면?"];
+const FAITH_QUESTIONS=[
+  ["하나님은 이 상황 속의 나를 어떻게 바라보실까?","내가 나를 보는 시선과, 하나님이 나를 바라보시는 시선을 나란히 놓아 봅니다."],
+  ["이 일에서 하나님께 맡길 것과 내가 감당할 몫은 무엇일까?","내 힘으로 바꿀 수 없는 것은 기도로 맡기고, 내가 할 수 있는 한 걸음을 찾아봅니다."]
+];
+const GOAL=20;
+const ACTIONS=["상대에게 직접 물어보기","내 마음을 차분히 말하기","부탁하기","잠시 쉬고 거리 두기","몸 움직이기·산책","믿을 만한 사람에게 이야기하기","지켜보며 기다리기","나에게 친절한 말 해 주기"];
+const STEPS=["상황","감정","생각","오류","전환","저장"];
+const STEP_TITLES=["상황관찰","감정찾기","자동적 생각","인지오류","관점 전환","확인·저장"];
+const LAST=STEPS.length-1;
+const PARTS=[["situation","상황"],["thoughts","자동적 생각"],["distortions","인지오류"],["alt","관점 전환"]];
+
+/* ================= 저장소 (이 기기) ================= */
+const K={records:"tr.records.v1",draft:"tr.draft.v1",settings:"tr.settings.v1",reports:"tr.reports.v1"};
+let storageOK=true;
+function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb}catch(e){storageOK=false;return fb}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){storageOK=false;return false}}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+
+const blank=()=>({situation:{when:[],where:[],who:[],what:[],memo:""},emotions:[],thoughts:[],thoughtMemo:"",distortions:[],distortionMemo:"",alt:{questions:[],sentences:[],memo:"",actions:[],faith:[],faithMemo:"",actionMemo:"",qMemo:"",altOwn:""}});
+let records=load(K.records,[]);
+let settings=Object.assign({nick:"",round:1,faith:true,parts:{situation:true,thoughts:true,distortions:true,alt:true}},load(K.settings,{}));
+let saved=load(K.draft,null);
+let draft=saved&&saved.d?saved.d:blank(), step=saved&&typeof saved.s==="number"?Math.min(saved.s,5):0, editingId=saved&&saved.e||null, stash=load("tr.stash.v1",null), activeQ="red", openId=null;
+const roundRecs=()=>records.filter(r=>(r.round||1)===settings.round);
+const persistDraft=()=>save(K.draft,{d:draft,s:step,e:editingId});
+if(typeof draft.distortionMemo!=="string")draft.distortionMemo="";
+draft.alt=Object.assign({questions:[],sentences:[],memo:"",actions:[],faith:[],faithMemo:"",actionMemo:"",qMemo:"",altOwn:""},draft.alt||{});draft.emotions.forEach(e=>{if(typeof e.after!=="number")e.after=e.i});
+
+/* ================= 도우미 ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toggle=(a,v)=>{const i=a.indexOf(v);i<0?a.push(v):a.splice(i,1)};
+const qvars=q=>`--qc:var(--q-${q});--qs:var(--q-${q}-soft)`;
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2200)}
+function fmt(ts){const d=new Date(ts);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+function norm(r){r.alt=Object.assign({questions:[],sentences:[],memo:"",actions:[],faith:[],faithMemo:"",actionMemo:"",qMemo:"",altOwn:""},r.alt||{});r.round=r.round||1;r.distortionMemo=r.distortionMemo||"";r.thoughtMemo=r.thoughtMemo||"";r.emotions.forEach(e=>{if(typeof e.after!=="number")e.after=e.i});return r}
+
+/* ================= 새 기록 ================= */
+function renderStepper(){
+  $("#stepper").innerHTML=STEPS.map((s,i)=>`<li><button data-go="${i}" class="${i<step?'done':i===step?'cur':''}" aria-label="${i+1}단계 ${STEP_TITLES[i]}" ${i===step?'aria-current="step"':''}><span class="bar"></span><span class="lbl">${s}</span></button></li>`).join("");
+}
+const chipsHTML=(key,opts,sel)=>`<div class="chips">${opts.map(o=>`<button class="chip" data-chip="${key}" data-v="${esc(o)}" aria-pressed="${sel.includes(o)}">${esc(o)}</button>`).join("")}</div>`;
+function cardsHTML(key,list,sel,kind){
+  return `<div class="cards">${list.map(([t,d,ex],i)=>`<button class="card${kind?' '+kind:''}" data-card="${key}" data-v="${esc(t)}" aria-pressed="${sel.includes(t)}"><span class="t"><span class="n">${i+1}</span>${esc(t)}</span>${kind==="belief"?`<span class="ex">${esc(d)}</span>`:`<span class="d">${esc(d)}</span><span class="ex">${esc(ex)}</span>`}</button>`).join("")}</div>`;
+}
+function altSuggestions(){
+  const out=[];
+  draft.thoughts.forEach(n=>{const f=THOUGHTS.find(x=>x[0]===n);if(f)out.push([f[3],"자동적 생각 · "+n])});
+  draft.distortions.forEach(n=>{const f=DISTORTIONS.find(x=>x[0]===n);if(f)out.push([f[3],"인지오류 · "+n])});
+  return out;
+}
+function renderPanel(){
+  let h="";const d=draft;
+  if(step===0){
+    h=`<h2>상황관찰</h2><p class="guide">판단은 빼고, 카메라에 찍힌 것처럼 사실만 고릅니다. 여러 개 눌러도 됩니다.</p>`;
+    for(const k of ["when","where","who","what"])h+=`<div class="group"><h3>${SITUATION[k].label}</h3>${chipsHTML(k,SITUATION[k].opts,d.situation[k])}</div>`;
+    h+=`<div class="group"><h3>한 줄 메모 (선택)</h3><input type="text" id="sit-memo" maxlength="120" placeholder="예) 회의에서 팀장이 수정할 곳 세 군데를 말했다" value="${esc(d.situation.memo)}"></div>`;
+  }else if(step===1){
+    const cnt=q=>d.emotions.filter(e=>e.q===q).length;
+    h=`<h2>감정찾기</h2><p class="guide">몸의 에너지와 기분의 쾌·불쾌로 영역을 고르고, 가장 가까운 단어를 누릅니다. 여러 영역에서 골라도 됩니다.</p>
+    <div class="meter"><div class="yaxis"><span>에너지<br>높음</span><span>↕</span><span>에너지<br>낮음</span></div>
+    <div class="quads">${QORDER.map(q=>`<button class="quad ${q}" data-quad="${q}" aria-pressed="${activeQ===q}"><b>${Q[q].name}</b><span>${Q[q].desc}</span><span class="cnt">${cnt(q)?cnt(q)+'개 선택':''}</span></button>`).join("")}</div>
+    <div class="xaxis">불쾌 ← → 유쾌</div></div>
+    <div class="words-head"><h3 style="margin:0;font-size:14px">${Q[activeQ].name} 영역 단어</h3><small>위쪽일수록 에너지가 높습니다</small></div>
+    <div class="words" style="${qvars(activeQ)}">${Q[activeQ].words.map(([en,ko])=>`<button class="word" data-word="${en}" aria-pressed="${d.emotions.some(e=>e.w===en)}"><span class="ko">${ko}</span><span class="en">${en}</span></button>`).join("")}</div>
+    <div class="group"><h3>고른 감정과 강도 (0–100)</h3><div class="tray">${d.emotions.length?d.emotions.map(e=>`<div class="trow" style="${qvars(e.q)}"><span class="nm">${e.ko}</span><input type="range" min="0" max="100" step="10" value="${e.i}" data-int="${e.w}" id="i-${e.w.replace(/\W/g,'')}" aria-label="${e.ko} 강도"><output>${e.i}</output><button class="x" data-rm="${e.w}" aria-label="${e.ko} 빼기">×</button></div>`).join(""):`<div class="empty">아직 고른 감정이 없습니다.</div>`}</div></div>`;
+  }else if(step===2){
+    h=`<h2>자동적 생각</h2><p class="guide">그 순간 저절로 떠오른 말이 어떤 모양이었는지 고릅니다.</p>${cardsHTML("thoughts",THOUGHTS,d.thoughts)}
+    <div class="group"><h3>떠오른 생각 기록하기 (선택)</h3><textarea id="thought-memo" rows="3" maxlength="300" placeholder="그 순간 머릿속에 떠오른 말을 그대로 적어 보세요. 예) 또 나만 틀렸네. 다들 나를 한심하게 보겠지.">${esc(d.thoughtMemo)}</textarea></div>`;
+  }else if(step===3){
+    h=`<h2>인지오류</h2><p class="guide">그 생각에 숨어 있는 생각의 습관을 고릅니다. 여러 개가 겹치기도 합니다.</p>${cardsHTML("distortions",DISTORTIONS,d.distortions)}
+    <div class="group"><h3>생각의 습관 기록하기 (선택)</h3><textarea id="distortion-memo" rows="3" maxlength="300" placeholder="고른 오류가 내 생각 어디에 숨어 있었는지 적어 보세요. 예) 한 번 늦은 걸 보고 ‘항상’ 그런다고 단정했다.">${esc(d.distortionMemo||"")}</textarea></div>`;
+  }else if(step===4){
+    const sug=altSuggestions();
+    h=`<h2>관점 전환</h2><p class="guide">앞에서 고른 생각을 다른 각도에서 봅니다. 도움이 된 질문과 문장을 누르고, 감정이 지금 얼마나 남았는지 다시 재 봅니다.</p>
+    <div class="group"><h3>스스로에게 던진 질문</h3>${chipsHTML("altq",ALT_QUESTIONS,d.alt.questions)}<textarea id="q-memo" rows="2" maxlength="200" style="margin-top:8px" placeholder="고른 질문에 대한 내 답을 써 보세요 (선택) 예) 사실은 아이가 숙제를 안 했다는 것뿐이다">${esc(d.alt.qMemo||"")}</textarea></div>
+    <div class="group"><h3>바꿔 본 생각 (앞에서 고른 항목에 맞춘 문장)</h3>${sug.length?`<div class="cards">${sug.map(([s,from])=>`<button class="card alt" data-alt="${esc(s)}" aria-pressed="${d.alt.sentences.includes(s)}"><span class="ex">${esc(s)}</span><span class="from">${esc(from)}</span></button>`).join("")}</div>`:`<div class="empty">3~4단계에서 항목을 고르면 여기에 맞춤 문장이 나옵니다.</div>`}<textarea id="alt-own" rows="2" maxlength="200" style="margin-top:8px" placeholder="내가 바꿔 본 생각을 직접 써 보세요 (선택) 예) 오늘 한 번 안 했다고 앞으로도 그런 건 아니다">${esc(d.alt.altOwn||"")}</textarea></div>
+    ${settings.faith?`<div class="group faith"><h3>신앙의 눈으로 보기</h3><div class="cards">${FAITH_QUESTIONS.map(([q,d])=>`<button class="card" data-chip="faith" data-v="${esc(q)}" aria-pressed="${draft.alt.faith.includes(q)}"><span class="t">${esc(q)}</span><span class="d">${esc(d)}</span></button>`).join("")}</div>
+      <textarea id="faith-memo" rows="2" maxlength="200" style="margin-top:8px" placeholder="떠오른 생각이나 짧은 기도 (선택)">${esc(d.alt.faithMemo)}</textarea></div>`:""}
+    <div class="group"><h3>기록 후 지금 드는 생각을 자유롭게 써 주세요</h3><textarea id="alt-memo" rows="3" maxlength="400" placeholder="(선택)">${esc(d.alt.memo)}</textarea></div>
+    <div class="group"><h3>지금 감정 다시 재기</h3><div class="tray">${d.emotions.length?d.emotions.map(e=>`<div class="trow" style="${qvars(e.q)}"><span class="nm">${e.ko}</span><input type="range" min="0" max="100" step="10" value="${e.after}" data-after="${e.w}" id="a-${e.w.replace(/\W/g,'')}" aria-label="${e.ko} 지금 강도"><output><span class="before">${e.i} →</span> ${e.after}</output><span></span></div>`).join(""):`<div class="empty">2단계에서 감정을 고르면 여기서 다시 잴 수 있습니다.</div>`}</div></div>
+    <div class="group"><h3>다음에 해 볼 행동</h3>${chipsHTML("act",ACTIONS,d.alt.actions)}<input type="text" id="action-memo" maxlength="100" style="margin-top:8px" placeholder="직접 써 보기 (선택) 예) 저녁 먹고 아이에게 먼저 오늘 어땠는지 묻기" value="${esc(d.alt.actionMemo||"")}"></div>`;
+  }else{
+    h=`<h2>확인·저장</h2><p class="guide">위쪽 단계 이름을 누르면 돌아가서 고칠 수 있습니다.${editingId?"":" 저장한 뒤 바로 그룹방에 공유할 수 있습니다."}</p>${summaryHTML(d)}`;
+  }
+  $("#panel").innerHTML=h;
+  $("#btn-prev").disabled=step===0;
+  $("#btn-next").textContent=step===LAST?(editingId?"수정 저장":"저장하기"):step===LAST-1?"확인하기":"다음";
+  $("#pos").textContent=`${step+1} / ${STEPS.length} · ${STEP_TITLES[step]}`;
+}
+const tags=a=>a.length?a.map(t=>`<span class="tag">${esc(t)}</span>`).join(""):`<span class="none">선택 안 함</span>`;
+function emoTags(r,withAfter){return r.emotions.length?r.emotions.map(e=>`<span class="tag q" style="${qvars(e.q)}">${esc(e.ko)} ${e.i}${withAfter&&e.after!==e.i?` → ${e.after}`:""}</span>`).join(""):`<span class="none">선택 안 함</span>`}
+function summaryHTML(r){
+  const s=r.situation,a=r.alt;
+  const altBody=[...a.sentences,...(a.altOwn?[a.altOwn]:[])];
+  return `<div class="sum">
+  <div class="sum-row"><span class="k">상황</span><div>${tags([...s.when,...s.where,...s.who,...s.what])}${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div></div>
+  <div class="sum-row"><span class="k">감정</span><div>${emoTags(r,true)}</div></div>
+  <div class="sum-row"><span class="k">자동적 생각</span><div>${tags(r.thoughts)}${r.thoughtMemo?`<div class="note">“${esc(r.thoughtMemo)}”</div>`:""}</div></div>
+  <div class="sum-row"><span class="k">인지오류</span><div>${tags(r.distortions)}${r.distortionMemo?`<div class="note">${esc(r.distortionMemo)}</div>`:""}</div></div>
+  <div class="sum-row"><span class="k">관점 전환</span><div>${a.questions.length||a.qMemo?`<div style="margin-bottom:6px">${a.questions.map(x=>`<div class="none">Q. ${esc(x)}</div>`).join("")}${a.qMemo?`<div class="note">${esc(a.qMemo)}</div>`:""}</div>`:""}${altBody.length?`<ul class="alt-list">${altBody.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<span class="none">문장 선택 안 함</span>`}${a.actions.length||a.actionMemo?`<div style="margin-top:6px"><span class="none">다음 행동 · </span>${a.actions.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}${a.actionMemo?`<span class="tag">${esc(a.actionMemo)}</span>`:""}</div>`:""}</div></div>
+  ${a.memo?`<div class="sum-row"><span class="k">지금 드는 생각</span><div class="note">${esc(a.memo)}</div></div>`:""}
+  ${a.faith.length||a.faithMemo?`<div class="sum-row"><span class="k">신앙의 눈</span><div>${a.faith.map(x=>`<div class="none">${esc(x)}</div>`).join("")}${a.faithMemo?`<div class="note">${esc(a.faithMemo)}</div>`:""}</div></div>`:""}
+  </div>`;
+}
+
+/* ================= 이벤트 ================= */
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  const ds=t.dataset;
+  if(ds.go!==undefined){step=+ds.go;persistDraft();draw();window.scrollTo({top:0});return}
+  if(ds.chip){
+    const map={altq:draft.alt.questions,act:draft.alt.actions,faith:draft.alt.faith};
+    const arr=map[ds.chip]||draft.situation[ds.chip];toggle(arr,ds.v);t.setAttribute("aria-pressed",arr.includes(ds.v));persistDraft();return}
+  if(ds.card){toggle(draft[ds.card],ds.v);t.setAttribute("aria-pressed",draft[ds.card].includes(ds.v));persistDraft();return}
+  if(ds.alt){toggle(draft.alt.sentences,ds.alt);t.setAttribute("aria-pressed",draft.alt.sentences.includes(ds.alt));persistDraft();return}
+  if(ds.quad){activeQ=ds.quad;renderPanel();return}
+  if(ds.word){const w=ds.word,i=draft.emotions.findIndex(x=>x.w===w);
+    if(i<0)draft.emotions.push({w,ko:WORD_Q[w].ko,q:WORD_Q[w].q,i:50,after:50});else draft.emotions.splice(i,1);persistDraft();renderPanel();return}
+  if(ds.rm){draft.emotions=draft.emotions.filter(x=>x.w!==ds.rm);persistDraft();renderPanel();return}
+  if(ds.open!==undefined){openId=ds.open;renderRecords();return}
+  if(ds.del){askDelete(ds.del);return}
+  if(ds.edit){startEdit(ds.edit);return}
+  if(ds.rview){const r=reports.find(x=>x.id===ds.rview);if(r)showReport(r);return}
+  if(ds.share){const r=records.find(x=>x.id===ds.share);if(r)openShare(r);return}
+  if(ds.round){viewRound=+ds.round;openId=null;renderRecords();return}
+  if(ds.part){shareParts[ds.part]=!shareParts[ds.part];renderShare();return}
+});
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="sit-memo")draft.situation.memo=t.value;
+  else if(t.id==="thought-memo")draft.thoughtMemo=t.value;
+  else if(t.id==="distortion-memo")draft.distortionMemo=t.value;
+  else if(t.id==="alt-memo")draft.alt.memo=t.value;
+  else if(t.id==="faith-memo")draft.alt.faithMemo=t.value;
+  else if(t.id==="action-memo")draft.alt.actionMemo=t.value;
+  else if(t.id==="q-memo")draft.alt.qMemo=t.value;
+  else if(t.id==="alt-own")draft.alt.altOwn=t.value;
+  else if(t.dataset.int){const em=draft.emotions.find(x=>x.w===t.dataset.int);if(em){const was=em.i;em.i=+t.value;if(em.after===was)em.after=em.i;t.nextElementSibling.textContent=t.value}}
+  else if(t.dataset.after){const em=draft.emotions.find(x=>x.w===t.dataset.after);if(em){em.after=+t.value;t.nextElementSibling.innerHTML=`<span class="before">${em.i} →</span> ${em.after}`}}
+  else if(t.id==="nick"){settings.nick=t.value.trim();save(K.settings,settings);return}
+  else return;
+  clearTimeout(persistDraft._t);persistDraft._t=setTimeout(persistDraft,300);
+});
+$("#btn-prev").onclick=()=>{if(step>0){step--;persistDraft();draw();window.scrollTo({top:0})}};
+$("#btn-next").onclick=()=>{
+  if(step<LAST){step++;persistDraft();draw();window.scrollTo({top:0});return}
+  if(editingId){finishEdit(true);return}
+  if(roundRecs().length>=GOAL){showTab("new");return}
+  const rec=norm({...JSON.parse(JSON.stringify(draft)),id:newId(),createdAt:Date.now(),round:settings.round});
+  rec.n=roundRecs().length+1;
+  records.unshift(rec);
+  if(!save(K.records,records)){records.shift();toast("이 브라우저에서는 저장할 수 없습니다. 홈 화면에 설치한 앱에서 써 주세요.");return}
+  draft=blank();step=0;activeQ="red";persistDraft();
+  if(rec.n>=GOAL){showTab("new");openShare(rec);return}
+  showTab("list");openId=rec.id;renderRecords();openShare(rec);
+};
+/* ---- 지난 기록 수정 ---- */
+function startEdit(id){
+  const r=records.find(x=>x.id===id);if(!r)return;
+  if(!editingId){stash={d:draft,s:step};save("tr.stash.v1",stash)}
+  editingId=id;draft=norm(JSON.parse(JSON.stringify(r)));step=0;activeQ=(draft.emotions[0]&&draft.emotions[0].q)||"red";persistDraft();showTab("new");
+}
+function finishEdit(keep){
+  const id=editingId;
+  if(keep){const i=records.findIndex(x=>x.id===id);
+    if(i>=0){const o=records[i];records[i]=norm({...JSON.parse(JSON.stringify(draft)),id:o.id,createdAt:o.createdAt,round:o.round,n:o.n,editedAt:Date.now()});
+      if(!save(K.records,records)){toast("저장하지 못했습니다. 다시 시도해 주세요.");return}}}
+  editingId=null;
+  if(stash){draft=stash.d||blank();step=stash.s||0}else{draft=blank();step=0}
+  stash=null;save("tr.stash.v1",null);persistDraft();
+  openId=id;showTab("list");toast(keep?"수정했습니다":"수정을 취소했습니다");
+}
+function renderEditBar(){
+  const r=editingId&&records.find(x=>x.id===editingId);
+  $("#edit-bar").innerHTML=r?`<div class="editbar"><span><b>${r.n}번째 기록</b> (${fmt(r.createdAt)}) 수정 중</span><button class="btn sm" id="btn-cancel-edit">수정 취소</button></div>`:"";
+  if(r)$("#btn-cancel-edit").onclick=()=>finishEdit(false);
+}
+function renderProg(){const n=Math.min(roundRecs().length,GOAL);$("#tab-count").textContent=records.length?` ${records.length}`:"";
+  $("#prog").innerHTML=`${settings.round>1?settings.round+"회차 · ":""}<span class="pb"><i style="width:${n/GOAL*100}%"></i></span>${n} / ${GOAL}`}
+function draw(){
+  renderProg();
+  renderEditBar();
+  const done=!editingId&&roundRecs().length>=GOAL;
+  $("#stepper").hidden=done;$("#nav").hidden=done||$("#view-new").hidden;
+  if(done){renderDone();return}
+  renderStepper();renderPanel()}
+function showTab(w){
+  ["new","list","set"].forEach(k=>{$("#tab-"+k).setAttribute("aria-selected",k===w);$("#view-"+k).hidden=k!==w});
+  $("#nav").hidden=w!=="new";renderProg();
+  if(w==="new")draw();else if(w==="list")renderRecords();else renderSettings();
+  window.scrollTo({top:0});
+}
+$("#tab-new").onclick=()=>showTab("new");$("#tab-list").onclick=()=>showTab("list");$("#tab-set").onclick=()=>showTab("set");
+
+/* ================= 지난 기록 ================= */
+const SAMPLE=norm({id:"sample",sample:true,createdAt:Date.now()-86400000,situation:{when:["저녁"],where:["집"],who:["자녀"],what:["대화를 나눔"],memo:"숙제를 아직 안 했다는 말을 들었다"},
+  emotions:[{w:"Frustrated",ko:"좌절한",q:"red",i:70,after:40},{w:"Disappointed",ko:"실망한",q:"blue",i:60,after:30}],thoughts:["비교","당연시"],thoughtMemo:"중학생이면 이 정도는 알아서 해야지",
+  distortions:["당위적 진술","재앙화"],distortionMemo:"",
+  n:0,alt:{questions:["가장 그럴듯한 결과는?"],faith:["이 일에서 하나님께 맡길 것과 내가 감당할 몫은 무엇일까?"],faithMemo:"",sentences:["‘해야 한다’ 대신 ‘그러면 좋겠다’로 바꿔 보자.","최악 말고, 가장 그럴듯한 결과는 무엇일까?"],memo:"",actions:["내 마음을 차분히 말하기"]}});
+function countBy(l){const m={};l.forEach(v=>m[v]=(m[v]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1])}
+function rankHTML(en){if(!en.length)return `<p class="none" style="margin:0">아직 없음</p>`;const max=en[0][1];
+  return `<ol class="rank">${en.slice(0,3).map(([k,c])=>`<li><span>${esc(k)}</span><span class="c">${c}회</span><span class="ml"><i style="width:${c/max*100}%"></i></span></li>`).join("")}</ol>`}
+let viewRound=null;
+function renderRecords(){
+  records.forEach(norm);
+  const rounds=[...new Set([...records.map(r=>r.round),settings.round])].sort((a,b)=>a-b);
+  if(viewRound===null||!rounds.includes(viewRound))viewRound=settings.round;
+  const shown=records.filter(r=>r.round===viewRound);
+  const byN={};shown.forEach(r=>byN[r.n]=r);
+  if(openId&&!shown.some(r=>r.id===openId))openId=null;
+  if(!openId&&shown.length)openId=shown.slice().sort((a,b)=>b.createdAt-a.createdAt)[0].id;
+  $("#tab-count").textContent=records.length?` ${records.length}`:"";
+  const md=ts=>{const d=new Date(ts);return `${d.getMonth()+1}/${d.getDate()}`};
+  const cells=Array.from({length:GOAL},(_,k)=>{const n=k+1,r=byN[n];
+    if(!r)return `<div class="cell empty" aria-label="${n}번째 칸, 아직 기록 없음"><span class="num">${n}</span></div>`;
+    const q=r.emotions[0]&&r.emotions[0].q;
+    return `<button class="cell" data-open="${r.id}" aria-pressed="${openId===r.id}" aria-label="${n}번째 기록 ${md(r.createdAt)}"><span class="num">${n}</span><span class="md">${md(r.createdAt)}</span><span class="pt" style="${q?`background:var(--q-${q})`:""}"></span></button>`}).join("");
+  const sel=shown.find(r=>r.id===openId);
+  const roundChips=rounds.length>1?`<div class="chips" style="margin-bottom:10px">${rounds.map(n=>`<button class="chip" data-round="${n}" aria-pressed="${n===viewRound}">${n}회차</button>`).join("")}</div>`:"";
+  $("#records").innerHTML=`${roundChips}
+  <div class="calhead"><h2>${viewRound}회차 기록 달력</h2><small>${shown.length} / ${GOAL} · 점 색은 첫 번째로 고른 감정의 영역</small></div>
+  <div class="cal">${cells}</div>
+  ${sel?`<article class="detail"><div class="dh"><b>${sel.n}번째 기록</b><span class="none">${fmt(sel.createdAt)}${sel.editedAt?" · 수정됨":""}</span></div>${summaryHTML(sel)}
+    <div class="acts"><button class="btn sm" data-del="${sel.id}">삭제</button><button class="btn sm" data-edit="${sel.id}">수정하기</button><button class="btn sm primary" data-share="${sel.id}">그룹방에 공유</button></div></article>`
+  :`<p class="empty" style="margin:0 0 14px">기록을 저장하면 달력 칸에 점이 찍힙니다. 칸을 누르면 그날의 기록을 보고 고칠 수 있습니다.</p>`}`;
+  const list=shown.length?shown:[SAMPLE],ex=shown.length?"":" (예시)";
+  const em=list.flatMap(r=>r.emotions),qc={};QORDER.forEach(q=>qc[q]=em.filter(e=>e.q===q).length);const tot=em.length||1;
+  const drop=em.length?Math.round(em.reduce((s,e)=>s+(e.i-e.after),0)/em.length):0;
+  $("#stats").innerHTML=`
+  <div class="stat"><h3>관점 전환 뒤 감정 강도${ex}</h3><div class="big">${drop>0?"−":drop<0?"+":""}${Math.abs(drop)}<small>평균 변화 · ${list.length}개 기록</small></div></div>
+  <div class="stat"><h3>감정 영역 분포${ex}</h3><div class="qbar">${QORDER.map(q=>`<i style="width:${qc[q]/tot*100}%;background:var(--q-${q})"></i>`).join("")}</div>
+    <div class="qleg">${QORDER.map(q=>`<span>${Q[q].name} <b>${qc[q]}</b></span>`).join("")}</div></div>
+  <div class="stat"><h3>자주 나온 인지오류${ex}</h3>${rankHTML(countBy(list.flatMap(r=>r.distortions)))}</div>`;
+}
+
+/* ================= 20개 완주 · 분석 리포트 ================= */
+let reports=load(K.reports,[]);
+let backupDone=false;
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+const sgn=v=>v>0?"−"+v:v<0?"+"+Math.abs(v):"0";
+function avgDrop(list){const em=list.flatMap(r=>r.emotions);return em.length?Math.round(em.reduce((s,e)=>s+(e.i-e.after),0)/em.length):0}
+function reportData(){
+  const list=roundRecs().slice().sort((a,b)=>a.createdAt-b.createdAt);
+  const em=list.flatMap(r=>r.emotions);const qc={};QORDER.forEach(q=>qc[q]=em.filter(e=>e.q===q).length);
+  const qTot=em.length;const topQ=QORDER.slice().sort((a,b)=>qc[b]-qc[a])[0];
+  const days=list.length?Math.max(1,Math.round((list[list.length-1].createdAt-list[0].createdAt)/86400000)+1):0;
+  const who=countBy(list.flatMap(r=>r.situation.who)),what=countBy(list.flatMap(r=>r.situation.what));
+  // 가장 자주 나온 '누구와' 상황에서 함께 나온 인지오류
+  const topWho=who[0]&&who[0][0];
+  const pairDist=topWho?countBy(list.filter(r=>r.situation.who.includes(topWho)).flatMap(r=>r.distortions)):[];
+  return {round:settings.round,list,days,from:list[0]&&list[0].createdAt,to:list.length&&list[list.length-1].createdAt,
+    first:avgDrop(list.slice(0,5)),last:avgDrop(list.slice(-5)),all:avgDrop(list),perRec:list.map(r=>r.emotions.length?avgDrop([r]):null),
+    qc,qTot,topQ,emo:countBy(em.map(e=>e.ko)),thoughts:countBy(list.flatMap(r=>r.thoughts)),dist:countBy(list.flatMap(r=>r.distortions)),
+    who,what,topWho,pairDist,altQ:countBy(list.flatMap(r=>r.alt.questions)),alt:countBy(list.flatMap(r=>[...r.alt.sentences,...(r.alt.altOwn?[r.alt.altOwn]:[])])),
+    acts:countBy(list.flatMap(r=>[...r.alt.actions,...(r.alt.actionMemo?[r.alt.actionMemo]:[])])),faith:list.filter(r=>r.alt.faith.length||r.alt.faithMemo).length,
+    memos:list.filter(r=>r.alt.memo).slice(-3).map(r=>[r.n,r.alt.memo])};
+}
+// 받침에 맞춰 조사 고르기 (예: 자녀와 / 동료와, 습관을 / 행동를 X)
+function josa(w,a,b){const c=String(w).replace(/[^가-힣A-Za-z0-9]+$/,"").slice(-1).charCodeAt(0);if(c<0xAC00||c>0xD7A3)return w+a;const j=(c-0xAC00)%28;return w+((a==="으로"?(j===0||j===8):j===0)?b:a)}
+function insights(R){
+  const out=[];
+  if(R.qTot)out.push(`고른 감정의 ${pct(R.qc[R.topQ],R.qTot)}%가 ${Q[R.topQ].name} 영역(${Q[R.topQ].desc})이었습니다.${R.emo[0]?` 가장 자주 고른 감정은 ‘${R.emo[0][0]}’입니다.`:""}`);
+  if(R.list.length>=10){const d=R.last-R.first;
+    out.push(d>=5?`관점 전환 뒤 감정이 누그러지는 폭이 처음 5개(${sgn(R.first)})보다 마지막 5개(${sgn(R.last)})에서 커졌습니다. 생각을 바꿔 보는 힘이 자라고 있습니다.`
+      :d<=-5?`관점 전환 뒤 감정이 누그러지는 폭이 처음보다 줄었습니다(${sgn(R.first)} → ${sgn(R.last)}). 최근 일이 더 무거웠거나, 관점 전환을 서둘렀을 수 있습니다.`
+      :`관점 전환 뒤 감정 변화는 처음과 마지막이 비슷했습니다(${sgn(R.first)} → ${sgn(R.last)}).`)}
+  if(R.dist[0])out.push(`가장 자주 나온 생각의 습관은 ‘${R.dist[0][0]}’(${R.dist[0][1]}회)${R.dist[1]?`, 그다음은 ‘${R.dist[1][0]}’(${R.dist[1][1]}회)`:""}입니다.`);
+  if(R.thoughts[0])out.push(`자동적 생각은 ‘${R.thoughts[0][0]}’의 모양으로 가장 많이 떠올랐습니다.`);
+  if(R.topWho&&R.pairDist[0])out.push(`‘${R.topWho}’ 관련 상황이 ${R.who[0][1]}번으로 가장 많았고, 그때 ${josa("‘"+R.pairDist[0][0]+"’","이","가").replace(/’(이|가)$/,"’$1")} 가장 자주 함께 나타났습니다.`);
+  if(R.acts[0])out.push(`다음 행동으로는 ‘${R.acts[0][0]}’ 쪽을 가장 많이 골랐습니다.`);
+  if(R.faith)out.push(`${R.list.length}개 중 ${R.faith}개의 기록에서 신앙의 눈으로 상황을 다시 바라보았습니다.`);
+  return out;
+}
+function nextSentence(R){const top=R.dist[0]&&DISTORTIONS.find(x=>x[0]===R.dist[0][0]);return top?top[3]:"오늘 떠오른 생각은 사실일까, 해석일까?"}
+const REFLECT=["20개의 기록 가운데 가장 마음에 남는 기록은 몇 번째이고, 왜 그런가요?","가장 자주 나온 생각의 습관이 처음 생긴 때를 떠올려 보면 언제인가요?","다음 20개를 시작한다면, 무엇을 다르게 해 보고 싶나요?"];
+function rankList(arr,n){return arr.length?`<ol class="rank">${arr.slice(0,n).map(([k,c])=>`<li><span>${esc(k)}</span><span class="c">${c}회</span><span class="ml"><i style="width:${c/arr[0][1]*100}%"></i></span></li>`).join("")}</ol>`:`<p class="none" style="margin:0">없음</p>`}
+function reportHTML(R){
+  const mx=Math.max(10,...R.perRec.map(v=>Math.abs(v||0)));
+  return `<div class="rp">
+  <p class="none" style="margin:6px 0 0">${settings.nick?esc(settings.nick)+" · ":""}${R.round}회차 · ${fmt(R.from).slice(0,10)} ~ ${fmt(R.to).slice(0,10)} (${R.days}일) · 기록 ${R.list.length}개</p>
+  <h3 class="sec">한눈에 보기</h3>
+  <ul class="insight">${insights(R).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+  <h3 class="sec">관점 전환 뒤 감정 변화</h3>
+  <div class="two"><div class="rbox"><h4>처음 5개 평균</h4><div class="big">${sgn(R.first)}</div></div><div class="rbox"><h4>마지막 5개 평균</h4><div class="big">${sgn(R.last)}</div></div></div>
+  <div style="margin-top:12px"><div class="bars" aria-label="기록별 감정 변화">${R.perRec.map(v=>`<i class="${v<0?"neg":""}" style="height:${Math.abs(v||0)/mx*100}%" title="${v===null?"감정 없음":sgn(v)}"></i>`).join("")}</div>
+  <div class="bx"><span>1번째</span><span>막대가 높을수록 관점 전환 뒤 감정이 많이 누그러짐</span><span>${R.list.length}번째</span></div></div>
+  <h3 class="sec">감정</h3>
+  <div class="qbar">${QORDER.map(q=>`<i style="width:${pct(R.qc[q],R.qTot)}%;background:var(--q-${q})"></i>`).join("")}</div>
+  <div class="qleg">${QORDER.map(q=>`<span>${Q[q].name} <b>${pct(R.qc[q],R.qTot)}%</b></span>`).join("")}</div>
+  <div class="rbox" style="margin-top:10px"><h4>자주 고른 감정</h4>${rankList(R.emo,5)}</div>
+  <h3 class="sec">생각의 패턴</h3>
+  <div class="two"><div class="rbox"><h4>자동적 생각</h4>${rankList(R.thoughts,3)}</div><div class="rbox"><h4>인지오류</h4>${rankList(R.dist,5)}</div></div>
+  <h3 class="sec">자주 마주한 상황</h3>
+  <div class="two"><div class="rbox"><h4>누구와</h4>${rankList(R.who,3)}</div><div class="rbox"><h4>무슨 일</h4>${rankList(R.what,3)}</div></div>
+  <h3 class="sec">관점 전환</h3>
+  <div class="two"><div class="rbox"><h4>도움이 된 질문</h4>${rankList(R.altQ,3)}</div><div class="rbox"><h4>다음 행동</h4>${rankList(R.acts,3)}</div></div>
+  <div class="rbox" style="margin-top:10px"><h4>가장 많이 붙잡은 바꿔 본 생각</h4>${R.alt.length?`<ul class="alt-list">${R.alt.slice(0,3).map(([k])=>`<li>${esc(k)}</li>`).join("")}</ul>`:`<p class="none" style="margin:0">없음</p>`}</div>
+  ${R.memos.length?`<div class="rbox" style="margin-top:10px"><h4>마지막 기록들에 남긴 생각</h4>${R.memos.map(([n,m])=>`<p class="note" style="margin:0 0 6px">${n}번째 · ${esc(m)}</p>`).join("")}</div>`:""}
+  <h3 class="sec">다음 회차에 붙잡을 문장</h3>
+  <p class="note" style="font-size:16px;margin:0">${esc(nextSentence(R))}</p>
+  <h3 class="sec">돌아보기 질문</h3>
+  <ol class="q">${REFLECT.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>
+  <p class="hint" style="margin-top:18px">이 리포트는 스스로 매긴 점수와 선택을 모아 계산한 것으로, 진단이 아닙니다.</p>
+  </div>`;
+}
+function reportText(R){
+  R=R||reportData();const top=(arr,n=3)=>arr.slice(0,n).map(([k,c])=>`${k}(${c})`).join(", ")||"-";
+  return [`🏁 ${settings.nick?settings.nick+"의 ":""}생각기록 ${R.round}회차 완주 (${GOAL}/${GOAL})`,``,
+    `▪ 기간: ${R.days}일`,
+    `▪ 자주 나온 자동적 생각: ${top(R.thoughts,2)}`,
+    `▪ 자주 나온 인지오류: ${top(R.dist)}`,
+    `▪ 가장 많이 붙잡은 생각: ${R.alt[0]?R.alt[0][0]:"-"}`,
+    `▪ 다음 회차에 붙잡을 문장: ${nextSentence(R)}`].join("\n");
+}
+// 리포트 파일(HTML): 앱 밖에서도 열리도록 화면 색과 글꼴을 함께 담음
+function reportFile(rep){
+  const css=[...document.styleSheets].flatMap(sh=>{try{return [...sh.cssRules].map(r=>r.cssText)}catch(e){return []}}).join("\n");
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(rep.title)}</title><style>${css}
+body{padding:24px 16px}.wrap{max-width:720px;margin:0 auto}</style></head><body><div class="wrap"><h1 style="font-family:var(--font-display)">${esc(rep.title)}</h1>${rep.html}</div></body></html>`;
+}
+let curReport=null;
+function generateReport(){
+  const R=reportData();
+  const rep={id:"rp"+R.round+"-"+Date.now(),round:R.round,createdAt:Date.now(),title:`생각기록 ${R.round}회차 분석 리포트`,html:reportHTML(R),text:reportText(R)};
+  reports=reports.filter(x=>x.round!==R.round);reports.unshift(rep);save(K.reports,reports);
+  showReport(rep);renderDoneOnly();
+}
+function showReport(rep){curReport=rep;$("#report-title").textContent=rep.title;$("#report-body").innerHTML=rep.html;$("#report-sheet").classList.add("open");$("#report-box").scrollTop=0}
+$("#report-close").onclick=()=>$("#report-sheet").classList.remove("open");
+$("#report-share").onclick=()=>{if(!curReport)return;shareRec=null;$("#share-parts").innerHTML="";$("#share-title").textContent="완주 요약 공유";$("#share-preview").textContent=curReport.text;$("#share-sheet").classList.add("open")};
+$("#report-file").onclick=async()=>{if(!curReport)return;const ok=await saveFile(`${curReport.title}.html`,reportFile(curReport),"text/html");if(ok)toast("리포트 파일을 저장했습니다")};
+const thisReport=()=>reports.find(x=>x.round===settings.round);
+function renderDoneOnly(){if(!$("#view-new").hidden&&!editingId&&roundRecs().length>=GOAL)renderDone()}
+function renderDone(){
+  const R=reportData(),rep=thisReport();
+  $("#panel").innerHTML=`<div class="done-hero"><div class="medal">${GOAL}</div><h2>${settings.round}회차 생각기록 ${GOAL}개를 모두 채웠습니다</h2>
+    <p class="guide" style="margin:0">${R.days}일 동안 ${GOAL}번 멈춰 서서 내 생각을 들여다보았습니다. 이번 회차는 여기서 마무리됩니다.</p></div>
+  <div class="donebox"><h3>분석 리포트</h3><p>20개 기록에서 감정, 생각의 습관, 자주 마주한 상황, 관점 전환의 흐름을 모아 정리합니다.</p>
+    <div class="row">${rep?`<button class="btn primary" id="btn-open-report">리포트 보기</button><button class="btn sm" id="btn-make-report">다시 만들기</button>`:`<button class="btn primary" id="btn-make-report">분석 리포트 만들기</button>`}</div></div>
+  <div class="donebox"><h3>백업 후 새로 시작</h3><p>기록은 이 휴대폰에만 있습니다. 백업 파일을 먼저 저장한 뒤 기록을 비우고 다음 20개를 시작합니다. 분석 리포트는 지워지지 않습니다.</p>
+    <div class="stepline"><span class="no ${backupDone?"ok":""}">${backupDone?"✓":"1"}</span><span class="tx">백업 파일 저장${backupDone?" 완료":""}</span><button class="btn sm" id="btn-done-backup">${backupDone?"다시 저장":"백업하기"}</button></div>
+    <div class="stepline"><span class="no">2</span><span class="tx">모든 기록 지우고 새로 시작</span><button class="btn sm" id="btn-reset" ${backupDone?"":"disabled"}>초기화</button></div>
+    ${backupDone?"":`<p class="hint" style="margin:6px 0 0">백업을 먼저 해야 초기화 버튼이 켜집니다.</p>`}</div>`;
+  $("#btn-make-report").onclick=generateReport;
+  if(rep)$("#btn-open-report").onclick=()=>showReport(rep);
+  $("#btn-done-backup").onclick=async()=>{if(await doBackup()){backupDone=true;renderDone()}};
+  $("#btn-reset").onclick=()=>{
+    $("#confirm-msg").textContent=`기록 ${records.length}개를 이 휴대폰에서 모두 지우고 새로 시작할까요? 백업 파일로만 되살릴 수 있습니다.`;
+    $("#confirm-yes").textContent="초기화";confirmAction=resetAll;$("#confirm").classList.add("open")};
+}
+function resetAll(){
+  if(!thisReport()){const R=reportData();reports.unshift({id:"rp"+R.round+"-"+Date.now(),round:R.round,createdAt:Date.now(),title:`생각기록 ${R.round}회차 분석 리포트`,html:reportHTML(R),text:reportText(R)});save(K.reports,reports)}
+  records=[];save(K.records,records);
+  settings.round=(settings.round||1)+1;save(K.settings,settings);
+  draft=blank();step=0;editingId=null;stash=null;save("tr.stash.v1",null);persistDraft();
+  backupDone=false;viewRound=null;openId=null;
+  showTab("new");toast(`초기화했습니다. ${settings.round}회차를 시작합니다.`);
+}
+
+/* ================= 공유 ================= */
+let shareRec=null,shareParts={};
+function shareText(r,p){
+  const s=r.situation,a=r.alt,L=[];
+  L.push(`📝 ${settings.nick?settings.nick+"의 ":""}생각기록 ${r.n?r.n+"번째 ":""}· ${fmt(r.createdAt)}`);
+  if(p.situation){const sit=[...s.when,...s.where,...s.who,...s.what].join(", ");L.push("",`▪ 상황: ${sit||"-"}`);if(s.memo)L.push(`  ${s.memo}`)}
+  if(p.thoughts){L.push(`▪ 자동적 생각: ${r.thoughts.join(", ")||"-"}`);if(r.thoughtMemo)L.push(`  “${r.thoughtMemo}”`)}
+  if(p.distortions){L.push(`▪ 인지오류: ${r.distortions.join(", ")||"-"}`);if(r.distortionMemo)L.push(`  ${r.distortionMemo}`)}
+  if(p.alt){const body=[...a.sentences,...(a.altOwn?[a.altOwn]:[])];
+    L.push(`▪ 관점 전환:`);
+    a.questions.forEach(x=>L.push(`  Q. ${x}`));if(a.qMemo)L.push(`  → ${a.qMemo}`);if(body.length)body.forEach(x=>L.push(`  - ${x}`));else L.push("  -");
+    const acts=[...a.actions,...(a.actionMemo?[a.actionMemo]:[])];if(acts.length)L.push(`  다음 행동: ${acts.join(", ")}`);
+    if(a.memo)L.push(`▪ 지금 드는 생각: ${a.memo}`);
+    if(a.faith.length||a.faithMemo){L.push(`▪ 신앙의 눈으로:`);a.faith.forEach(x=>L.push(`  - ${x}`));if(a.faithMemo)L.push(`  “${a.faithMemo}”`)}}
+  return L.join("\n");
+}
+function openShare(r){$("#share-title").textContent="그룹방에 공유하기";shareRec=r;shareParts={...settings.parts};renderShare();$("#share-sheet").classList.add("open")}
+function renderShare(){
+  $("#share-parts").innerHTML=PARTS.map(([k,l])=>`<button class="chip" data-part="${k}" aria-pressed="${!!shareParts[k]}">${l}</button>`).join("");
+  $("#share-preview").textContent=shareText(shareRec,shareParts);
+}
+async function copyText(txt){
+  try{await navigator.clipboard.writeText(txt);return true}catch(e){}
+  try{const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();const ok=document.execCommand("copy");ta.remove();return ok}catch(e){return false}
+}
+$("#share-close").onclick=()=>$("#share-sheet").classList.remove("open");
+const curShare=()=>shareRec?shareText(shareRec,shareParts):$("#share-preview").textContent;
+$("#share-copy").onclick=async()=>{toast(await copyText(curShare())?"복사했습니다. 그룹방에 붙여넣기 하세요.":"복사가 막혀 있습니다. 미리보기 글을 길게 눌러 복사해 주세요.")};
+$("#share-go").onclick=async()=>{
+  const txt=curShare();
+  if(navigator.share){try{await navigator.share({text:txt});$("#share-sheet").classList.remove("open");return}catch(e){if(e&&e.name==="AbortError")return}}
+  toast(await copyText(txt)?"이 화면에서는 바로 공유가 안 돼서 복사해 두었습니다. 그룹방에 붙여넣기 하세요.":"미리보기 글을 길게 눌러 복사해 주세요.");
+};
+$("#report-sheet").addEventListener("click",e=>{if(e.target.id==="report-sheet")$("#report-sheet").classList.remove("open")});
+$("#share-sheet").addEventListener("click",e=>{if(e.target.id==="share-sheet")$("#share-sheet").classList.remove("open")});
+
+/* ================= 삭제 확인 ================= */
+let confirmAction=null;
+function askDelete(id){if(id===editingId){toast("수정 중인 기록입니다. 먼저 수정을 끝내거나 취소해 주세요.");return}$("#confirm-msg").textContent="이 기록을 삭제할까요? 되돌릴 수 없습니다.";$("#confirm-yes").textContent="삭제";
+  confirmAction=()=>{records=records.filter(r=>r.id!==id);renumber();save(K.records,records);openId=null;renderRecords();renderProg();toast("삭제했습니다")};$("#confirm").classList.add("open")}
+function renumber(){const by={};records.slice().sort((a,b)=>a.createdAt-b.createdAt).forEach(r=>{const k=r.round||1;by[k]=(by[k]||0)+1;r.n=by[k]})}
+$("#confirm-no").onclick=()=>{$("#confirm").classList.remove("open");confirmAction=null};
+$("#confirm-yes").onclick=()=>{$("#confirm").classList.remove("open");const f=confirmAction;confirmAction=null;f&&f()};
+
+/* ================= 설정·백업 ================= */
+function renderSettings(){
+  $("#report-list").innerHTML=reports.length?reports.map(r=>`<div class="it"><span>${esc(r.title)}<br><small class="none">${fmt(r.createdAt)}</small></span><span class="row"><button class="btn sm" data-rview="${r.id}">보기</button></span></div>`).join(""):`<p class="none" style="margin:0">아직 만든 리포트가 없습니다.</p>`;
+  $("#nick").value=settings.nick||"";$("#faith-on").checked=!!settings.faith;
+  $("#share-defaults").innerHTML=PARTS.map(([k,l])=>`<label class="switch" for="sd-${k}"><span>${l}</span><input type="checkbox" id="sd-${k}" data-sd="${k}" ${settings.parts[k]?"checked":""}></label>`).join("");
+  $("#store-note").textContent=storageOK?`지금 이 기기에 저장된 기록: ${records.length}개 (지금 ${settings.round}회차 ${Math.min(roundRecs().length,GOAL)}/${GOAL})`:"이 화면에서는 기기에 저장할 수 없습니다. 홈 화면에 설치한 앱에서 써 주세요.";
+  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  $("#install-state").textContent=standalone?"앱으로 설치되어 실행 중입니다.":"설치하면 앱처럼 열리고, 인터넷이 없어도 기록할 수 있습니다.";
+}
+document.addEventListener("change",async e=>{
+  const t=e.target;
+  if(t.dataset.sd){settings.parts[t.dataset.sd]=t.checked;save(K.settings,settings)}
+  if(t.id==="faith-on"){settings.faith=t.checked;save(K.settings,settings)}
+  if(t.id==="restore-file"&&t.files[0]){
+    try{const data=JSON.parse(await t.files[0].text());const list=Array.isArray(data)?data:data.records;
+      if(!Array.isArray(list))throw 0;
+      const have=new Set(records.map(r=>r.id));let n=0;
+      list.forEach(r=>{if(r&&r.id&&r.situation&&!have.has(r.id)){records.push(norm(r));n++}});
+      records.sort((a,b)=>b.createdAt-a.createdAt);renumber();const mx=Math.max(1,...records.map(r=>r.round||1));if(mx>settings.round){settings.round=mx;save(K.settings,settings)}save(K.records,records);renderSettings();renderProg();toast(`${n}개 기록을 불러왔습니다`);
+    }catch(err){toast("백업 파일을 읽지 못했습니다. 이 앱에서 만든 .json 파일인지 확인해 주세요.")}
+    t.value="";
+  }
+});
+async function saveFile(name,data,mime){
+  try{const f=new File([data],name,{type:mime});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return true}}catch(e){if(e&&e.name==="AbortError")return false}
+  try{const dl=window.claude&&await window.claude.use("downloads");if(dl){await dl.save({filename:name,data});return true}}catch(e){return false}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove();return true}catch(e){toast("이 화면에서는 파일을 만들 수 없습니다. 설치한 앱에서 해 주세요.");return false}
+}
+async function doBackup(){
+  if(!records.length){toast("백업할 기록이 없습니다");return false}
+  const d=new Date(),name=`생각기록-백업-${settings.round}회차-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`;
+  const ok=await saveFile(name,JSON.stringify({app:"thought-record",version:1,exportedAt:Date.now(),round:settings.round,records},null,1),"application/json");
+  if(ok)toast("백업 파일을 저장했습니다. 파일이 있는 곳(카톡 나와의 채팅, 파일 앱 등)을 꼭 확인해 주세요.");
+  return ok;
+}
+$("#btn-backup").onclick=()=>doBackup();
+
+/* ================= 설치(PWA) ================= */
+let installEvt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEvt=e;$("#btn-install").hidden=false});
+$("#btn-install").onclick=async()=>{if(!installEvt)return;installEvt.prompt();try{await installEvt.userChoice}catch(e){}installEvt=null;$("#btn-install").hidden=true};
+if("serviceWorker" in navigator&&location.protocol==="https:"){try{navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}}
+
+records.forEach(norm);if(records.some(r=>!r.n)){renumber();save(K.records,records)}
+draw();renderRecords();
+</script>
+</body>
+</html>
