@@ -118,6 +118,7 @@ textarea,input[type=text]{width:100%;border:1px solid var(--line);background:var
 .card .ex::before{content:"예) ";color:var(--muted);font-family:var(--font-body)}
 .card.belief .ex::before{content:"대표 생각 · "}
 .card.alt .ex::before{content:""}
+.mine{background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:2px}
 .citem{display:flex;flex-direction:column;gap:6px}
 .cnote{font-size:15px;border-color:var(--accent);background:var(--surface)}
 .chip.etc{border-style:dashed}
@@ -435,6 +436,10 @@ function noteBox(kind,key,val,name){return `<textarea class="cnote" rows="2" max
 function cardsHTML(key,list,sel,notes){
   return `<div class="cards">${list.map(([t,d,ex],i)=>`<div class="citem"><button class="card" data-card="${key}" data-v="${esc(t)}" aria-pressed="${sel.includes(t)}"><span class="t"><span class="n">${i+1}</span>${esc(t)}</span><span class="d">${esc(d)}</span><span class="ex">${esc(ex)}</span></button>${notes&&sel.includes(t)?noteBox(key,t,notes[t]):""}</div>`).join("")}</div>`;
 }
+function myThoughts(d){const out=[];
+  d.thoughts.forEach(x=>{if(d.thoughtNotes[x])out.push([x,d.thoughtNotes[x]])});
+  d.distortions.forEach(x=>{if(d.distortionNotes[x])out.push([x,d.distortionNotes[x]])});
+  if(d.thoughtMemo)out.push(["떠오른 생각",d.thoughtMemo]);return out}
 function altSuggestions(){
   const out=[];
   draft.thoughts.forEach(n=>{const f=THOUGHTS.find(x=>x[0]===n);if(f)out.push([f[3],"자동적 생각 · "+n])});
@@ -470,7 +475,11 @@ function renderPanel(){
     const sug=altSuggestions();
     h=`<h2>관점 전환</h2><p class="guide">앞에서 고른 생각을 다른 각도에서 봅니다. 도움이 된 질문과 문장을 누르고, 감정이 지금 얼마나 남았는지 다시 재 봅니다.</p>
     <div class="group"><h3>스스로에게 던진 질문</h3>${chipsHTML("altq",ALT_QUESTIONS,d.alt.questions)}<textarea id="q-memo" rows="2" maxlength="200" style="margin-top:8px" placeholder="고른 질문에 대한 내 답을 써 보세요 (선택) 예) 사실은 아이가 숙제를 안 했다는 것뿐이다">${esc(d.alt.qMemo||"")}</textarea></div>
-    <div class="group"><h3>바꿔 본 생각 (누르면 노트 칸이 열립니다)</h3>${sug.length?`<div class="cards">${sug.map(([s,from])=>`<div class="citem"><button class="card alt" data-alt="${esc(s)}" aria-pressed="${d.alt.sentences.includes(s)}"><span class="ex">${esc(s)}</span><span class="from">${esc(from)}</span></button>${d.alt.sentences.includes(s)?noteBox("alt",s,d.alt.sentenceNotes[s],s.slice(0,20)):""}</div>`).join("")}</div>`:`<div class="empty">3~4단계에서 항목을 고르면 여기에 맞춤 문장이 나옵니다.</div>`}<textarea id="alt-own" rows="2" maxlength="200" style="margin-top:8px" placeholder="내가 바꿔 본 생각을 직접 써 보세요 (선택) 예) 오늘 한 번 안 했다고 앞으로도 그런 건 아니다">${esc(d.alt.altOwn||"")}</textarea></div>
+    <div class="group"><h3>바꿔 본 생각</h3>
+      ${myThoughts(d).length?`<div class="mine"><span class="none">앞에서 내가 적은 생각</span>${myThoughts(d).map(([k,v])=>`<div class="note">${esc(k)} · “${esc(v)}”</div>`).join("")}</div>`:""}
+      <textarea id="alt-own" rows="3" maxlength="300" placeholder="위 생각을 다른 눈으로 바꿔 써 보세요 (선택) 예) 오늘 한 번 안 했다고 앞으로도 그런 건 아니다">${esc(d.alt.altOwn||"")}</textarea>
+      <h3 style="margin:16px 0 8px">생각 제안 (참고 · 누르면 노트 칸이 열립니다)</h3>
+      ${sug.length?`<div class="cards">${sug.map(([s,from])=>`<div class="citem"><button class="card alt" data-alt="${esc(s)}" aria-pressed="${d.alt.sentences.includes(s)}"><span class="ex">${esc(s)}</span><span class="from">${esc(from)}</span></button>${d.alt.sentences.includes(s)?noteBox("alt",s,d.alt.sentenceNotes[s],s.slice(0,20)):""}</div>`).join("")}</div>`:`<div class="empty">3~4단계에서 항목을 고르면 여기에 참고할 문장이 나옵니다.</div>`}</div>
     ${settings.faith?`<div class="group faith"><h3>신앙의 눈으로 보기</h3><div class="cards">${FAITH_QUESTIONS.map(([q,d])=>`<button class="card" data-chip="faith" data-v="${esc(q)}" aria-pressed="${draft.alt.faith.includes(q)}"><span class="t">${esc(q)}</span><span class="d">${esc(d)}</span></button>`).join("")}</div>
       <textarea id="faith-memo" rows="2" maxlength="200" style="margin-top:8px" placeholder="떠오른 생각이나 짧은 기도 (선택)">${esc(d.alt.faithMemo)}</textarea></div>`:""}
     <div class="group"><h3>기록 후 지금 드는 생각을 자유롭게 써 주세요</h3><textarea id="alt-memo" rows="3" maxlength="400" placeholder="(선택)">${esc(d.alt.memo)}</textarea></div>
@@ -490,13 +499,13 @@ function sitList(r){const s=r.situation,e=s.etc||{};return [...s.when,...(e.when
 function notedList(items,notes){if(!items.length)return `<span class="none">선택 안 함</span>`;return items.map(x=>`<div style="margin-bottom:4px"><span class="tag">${esc(x)}</span>${notes&&notes[x]?`<div class="note" style="margin:2px 0 0 4px">${esc(notes[x])}</div>`:""}</div>`).join("")}
 function summaryHTML(r){
   const s=r.situation,a=r.alt;
-  const altBody=[...a.sentences,...(a.altOwn?[a.altOwn]:[])];
+  const altBody=[...(a.altOwn?[a.altOwn]:[]),...a.sentences];
   return `<div class="sum">
   <div class="sum-row"><span class="k">상황</span><div>${tags(sitList(r))}${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div></div>
   <div class="sum-row"><span class="k">감정</span><div>${emoTags(r,true)}</div></div>
   <div class="sum-row"><span class="k">자동적 생각</span><div>${r.target.length?`<div class="none" style="margin-bottom:4px">향하는 쪽 · ${r.target.join(", ")}</div>`:""}${notedList(r.thoughts,r.thoughtNotes)}${r.thoughtMemo?`<div class="note">“${esc(r.thoughtMemo)}”</div>`:""}</div></div>
   <div class="sum-row"><span class="k">인지오류</span><div>${notedList(r.distortions,r.distortionNotes)}${r.distortionMemo?`<div class="note">${esc(r.distortionMemo)}</div>`:""}</div></div>
-  <div class="sum-row"><span class="k">관점 전환</span><div>${a.questions.length||a.qMemo?`<div style="margin-bottom:6px">${a.questions.map(x=>`<div class="none">Q. ${esc(x)}</div>`).join("")}${a.qMemo?`<div class="note">${esc(a.qMemo)}</div>`:""}</div>`:""}${altBody.length?`<ul class="alt-list">${altBody.map(x=>`<li>${esc(x)}${a.sentenceNotes&&a.sentenceNotes[x]?`<div class="none" style="font-family:var(--font-body)">↳ ${esc(a.sentenceNotes[x])}</div>`:""}</li>`).join("")}</ul>`:`<span class="none">문장 선택 안 함</span>`}${a.actions.length||a.actionMemo?`<div style="margin-top:6px"><span class="none">다음 행동 · </span>${a.actions.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}${a.actionMemo?`<span class="tag">${esc(a.actionMemo)}</span>`:""}</div>`:""}</div></div>
+  <div class="sum-row"><span class="k">관점 전환</span><div>${a.questions.length||a.qMemo?`<div style="margin-bottom:6px">${a.questions.map(x=>`<div class="none">Q. ${esc(x)}</div>`).join("")}${a.qMemo?`<div class="note">${esc(a.qMemo)}</div>`:""}</div>`:""}${altBody.length?`${a.altOwn?`<div class="note"><span class="none" style="font-family:var(--font-body)">내 생각 · </span>${esc(a.altOwn)}</div>`:""}${a.sentences.length?`<ul class="alt-list">${a.sentences.map(x=>`<li><span class="none" style="font-family:var(--font-body)">참고 · </span>${esc(x)}${a.sentenceNotes&&a.sentenceNotes[x]?`<div class="none" style="font-family:var(--font-body)">↳ ${esc(a.sentenceNotes[x])}</div>`:""}</li>`).join("")}</ul>`:""}`:`<span class="none">문장 선택 안 함</span>`}${a.actions.length||a.actionMemo?`<div style="margin-top:6px"><span class="none">다음 행동 · </span>${a.actions.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}${a.actionMemo?`<span class="tag">${esc(a.actionMemo)}</span>`:""}</div>`:""}</div></div>
   ${a.memo?`<div class="sum-row"><span class="k">지금 드는 생각</span><div class="note">${esc(a.memo)}</div></div>`:""}
   ${a.faith.length||a.faithMemo?`<div class="sum-row"><span class="k">신앙의 눈</span><div>${a.faith.map(x=>`<div class="none">${esc(x)}</div>`).join("")}${a.faithMemo?`<div class="note">${esc(a.faithMemo)}</div>`:""}</div></div>`:""}
   </div>`;
@@ -772,9 +781,9 @@ function shareText(r,p){
   if(p.situation){const sit=sitList(r).join(", ");L.push("",`▪ 상황: ${sit||"-"}`);if(s.memo)L.push(`  ${s.memo}`)}
   if(p.thoughts){L.push(`▪ 자동적 생각${r.target.length?` (${r.target.join("·")}을 향함)`:""}: ${r.thoughts.join(", ")||"-"}`);r.thoughts.forEach(x=>{if(r.thoughtNotes[x])L.push(`  ${x}: “${r.thoughtNotes[x]}”`)});if(r.thoughtMemo)L.push(`  “${r.thoughtMemo}”`)}
   if(p.distortions){L.push(`▪ 인지오류: ${r.distortions.join(", ")||"-"}`);r.distortions.forEach(x=>{if(r.distortionNotes[x])L.push(`  ${x}: ${r.distortionNotes[x]}`)});if(r.distortionMemo)L.push(`  ${r.distortionMemo}`)}
-  if(p.alt){const body=[...a.sentences,...(a.altOwn?[a.altOwn]:[])];
+  if(p.alt){const body=[];
     L.push(`▪ 관점 전환:`);
-    a.questions.forEach(x=>L.push(`  Q. ${x}`));if(a.qMemo)L.push(`  → ${a.qMemo}`);if(body.length)body.forEach(x=>{L.push(`  - ${x}`);if(a.sentenceNotes[x])L.push(`    ↳ ${a.sentenceNotes[x]}`)});else L.push("  -");
+    a.questions.forEach(x=>L.push(`  Q. ${x}`));if(a.qMemo)L.push(`  → ${a.qMemo}`);if(a.altOwn)L.push(`  내 생각: ${a.altOwn}`);a.sentences.forEach(x=>{L.push(`  (참고) ${x}`);if(a.sentenceNotes[x])L.push(`    ↳ ${a.sentenceNotes[x]}`)});if(!a.altOwn&&!a.sentences.length)L.push("  -");
     const acts=[...a.actions,...(a.actionMemo?[a.actionMemo]:[])];if(acts.length)L.push(`  다음 행동: ${acts.join(", ")}`);
     if(a.memo)L.push(`▪ 지금 드는 생각: ${a.memo}`);
     if(a.faith.length||a.faithMemo){L.push(`▪ 신앙의 눈으로:`);a.faith.forEach(x=>L.push(`  - ${x}`));if(a.faithMemo)L.push(`  “${a.faithMemo}”`)}}
